@@ -49,17 +49,20 @@ public class RankManager {
 			p.sendMessage("ELO rank: " + Math.round(playerentity.getRank()));
 		}
 	}
+	public void refreshHonorBar(Player p) {
+		if(p == null) {
+			return;
+		}
+		double rank = this.getPlayerRankEntity(p).getRank();
+		p.setTotalExperience(0);
+		p.setLevel((int) Math.round(rank));
+	}
 	public void broadcastUpdate(PlayerRankEntity playerentity, double oldrank) {
 		Player p = plugin.getServer().getPlayer(playerentity.getPlayer());
 		if(p != null) {
 			//sendMessage("ELO rank: " + Math.round(playerentity.getRank()));
 			p.sendMessage("New rank: " + Math.round(playerentity.getRank()) + ", thats a change of: " + Math.round(playerentity.getRank() - oldrank));
 			//System.out.println("Was: " + Math.round(oldrank) + ", thats a change of: " + Math.round(playerentity.getRank() - oldrank));
-			
-			
-			//TODO
-			p.setTotalExperience(0);
-			p.setLevel((int) Math.round(playerentity.getRank()));
 			
 			
 			RankChangeEvent rankEvent = new RankChangeEvent(p,playerentity.getRank(),playerentity);
@@ -224,7 +227,8 @@ public class RankManager {
 			this.broadcastUpdate(ventity, vold);
 		}
 		
-		// TODO Auto-generated method stub
+		refreshHonorBar(hitter);
+		refreshHonorBar(victim);
 		
 	}
 }
