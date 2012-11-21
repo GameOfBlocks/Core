@@ -1,8 +1,9 @@
 author: Elias Woods
 database: false
-description: plugin to track elo rankings of players
-main: com.westeroscraft.gob.honor.HonorPlugin
-name: ELOrank
+description: plugin for westeroscraft
+main: com.westeroscraft.gob.core.CorePlugin
+name: GOB
+depend: [Citizens]
 startup: postworld
 version: '0.1'
 commands:
