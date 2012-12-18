@@ -1,6 +1,6 @@
 package com.westeroscraft.gob.core.properties;
 
-import com.westeroscraft.gob.core.Property;
+import com.westeroscraft.gob.geo.Property;
 
 public class HonorProperty implements Property {
 	private int honor;

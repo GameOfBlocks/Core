@@ -7,17 +7,17 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.ListIterator;
 import java.util.Map.Entry;
+import java.util.Stack;
 import java.util.WeakHashMap;
 import java.util.logging.Level;
 
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.event.NPCDamageByEntityEvent;
-import net.citizensnpcs.api.event.NPCDamageEvent;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.npc.NPC;
 import net.minecraft.server.NBTTagCompound;
@@ -26,23 +26,23 @@ import net.minecraft.server.NBTTagString;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
-import org.bukkit.block.Block;
-import org.bukkit.block.BlockState;
-import org.bukkit.block.Sign;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.inventory.CraftItemStack;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.Event.Result;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContinuationPending;
@@ -54,9 +54,13 @@ import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.serialize.ScriptableInputStream;
 import org.mozilla.javascript.serialize.ScriptableOutputStream;
 
+import com.westeroscraft.gob.menu.Menu;
+import com.westeroscraft.gob.menu.TeleportSpawnButton;
+import com.westeroscraft.gob.menu.TestToggleButton;
 import com.westeroscraft.gob.scripting.JSFunctions;
 import com.westeroscraft.gob.scripting.JsSystem;
-import com.westeroscraft.gob.scripting.Npc;
+import com.westeroscraft.gob.shipping.PendingPackage;
+import com.westeroscraft.gob.shipping.ShippableInventory;
 
 
 public class CorePlugin extends JavaPlugin implements Listener {
@@ -64,7 +68,6 @@ public class CorePlugin extends JavaPlugin implements Listener {
 	public WeakHashMap<Player,Scriptable> playerData = new WeakHashMap<Player,Scriptable>();
 	public HashSet<String> questItems = new HashSet<String>();
 	public ScriptableObject scope;
-	private String[] rows = {new String()}; 
 	
 	public void onEnable() {
 		this.getServer().getPluginManager().registerEvents(this, this);
@@ -88,7 +91,10 @@ public class CorePlugin extends JavaPlugin implements Listener {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+
 		this.getLogger().log(Level.INFO, "Finsihed loading NPCs");
+		
+		
 	}
 	
 	public void onDisable() {
@@ -107,7 +113,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 	}
 	@EventHandler
 	public void onDropEvent(PlayerDropItemEvent e) {
-		if(!this.getQuestTag(e.getItemDrop().getItemStack()).isEmpty()){
+		if(!CorePlugin.getQuestTag(e.getItemDrop().getItemStack()).isEmpty()){
 			e.getItemDrop().remove();
 		}
 	}
@@ -116,19 +122,122 @@ public class CorePlugin extends JavaPlugin implements Listener {
 		Iterator<ItemStack> itr = e.getDrops().iterator();
 		while(itr.hasNext()) {
 			ItemStack is = itr.next();
-			if(!this.getQuestTag(is).isEmpty()){
+			if(!CorePlugin.getQuestTag(is).isEmpty()){
 				itr.remove();
 			}
 		}
 	}
+	
+	
+
 	@EventHandler
 	public void onInventoryClickEvent(InventoryClickEvent e) {
-		if(!(e.getInventory() instanceof PlayerInventory)) {
-			if(this.getQuestTag(e.getCursor()).equals("log")){
-				e.setResult(Result.DENY);
+		System.out.println("Click!" + e.getRawSlot());
+		if(e.getView().getType() == InventoryType.CRAFTING) {
+			e.getView();
+			if(e.getCursor() == null || e.getCursor().getType() == Material.AIR && e.getRawSlot() == InventoryView.OUTSIDE){
+				Menu inv = getMenu(e.getWhoClicked());
+				this.pushInventory(e.getWhoClicked(), e.getInventory(), true);
+				openMenu(inv, e.getWhoClicked());
 			}
 		}
 	}
+	
+	
+	
+	
+	private Menu getMenu(HumanEntity e) {
+		Menu m = metashipping.get(e);
+		if(m == null) {
+			Inventory inv = this.getServer().createInventory(e, 27,"Game Menu");
+			m = new Menu(inv);
+			this.getServer().getPluginManager().registerEvents(m, this);
+			m.addMenuItem(new TestToggleButton());
+			m.addMenuItem(new TeleportSpawnButton(e));
+			metashipping.put(e, m);
+		}
+		return m;
+	}
+
+	private void openMenu(Menu m, HumanEntity e) {
+		m.rerender();
+		
+		e.openInventory(m.getInventory());
+	}
+
+	@EventHandler
+	public void onInventoryOpenEvent(InventoryOpenEvent e) {
+		System.out.println("INV: " + e.getView().getType().name());
+		if(e.getView().getType() == InventoryType.CRAFTING) {
+
+		}
+	}
+	@EventHandler
+	public void onInventoryCloseEvent(InventoryCloseEvent e) {
+		System.out.println("INV CLOSE: " + e.getView().getType().name());
+		if(e.getView().getType() == InventoryType.CRAFTING) {
+
+		}
+		if(e.getPlayer()  instanceof Player) {
+			Player  p = (Player) e.getPlayer();
+			Stack<Inventory> s = currentinv.get(p);
+			if(s != null) {
+				if(!s.isEmpty()) {
+					Inventory inv = s.pop();
+					if(inv != null) {
+						p.openInventory(inv);
+					}
+				}
+			}
+		}
+	}
+	
+	private void pushInventory(HumanEntity e, Inventory i, boolean buffer) {
+		//Remember the previous inventory
+		if(i != null) {
+			Stack<Inventory> s = currentinv.get(e);
+			if(s == null){
+				s = new Stack<Inventory>();
+				currentinv.put(e, s);
+			}
+			s.push(i);
+			if(buffer) { s.push(null); } // Buffer the close event from opening the new inventory
+		}
+	}
+	
+	
+	private WeakHashMap<HumanEntity, Menu> metashipping = new WeakHashMap<HumanEntity,Menu>();
+	private WeakHashMap<HumanEntity, Stack<Inventory>> currentinv = new WeakHashMap<HumanEntity,Stack<Inventory>>();
+	
+	/*private void openShipping(HumanEntity h, Inventory inventory) {
+		if(h instanceof Player) {
+			Player p = (Player) h;
+			Inventory inv = metashipping.get(p);
+			if(inv == null) { //Create the virtual inventory
+				inv = this.getServer().createInventory(p, 27,"Shipping");
+				metashipping.put(p, inv);
+			}
+			
+			//Remember the previous inventory
+			if(inventory != null) {
+				Stack<Inventory> s = currentinv.get(p);
+				if(s == null){
+					s = new Stack<Inventory>();
+					currentinv.put(p, s);
+				}
+				s.push(inventory);
+				s.push(null); // Buffer the close event from opening the new inventory
+			}
+			//Rebuild virtual chest
+			//inv.clear();
+			CraftItemStack itm = new CraftItemStack(Material.CHEST);
+			CorePlugin.setName(itm, "Wintefell");
+			inv.addItem(itm);
+			p.openInventory(inv);
+			
+		}
+	}*/
+
 	@EventHandler
 	public void onNPCRightClickEvent(NPCRightClickEvent e) {
 		ScriptableObject n = registry.get(e.getNPC());
@@ -161,7 +270,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 			}
 		}
 	}
-	public String getQuestTag(ItemStack item) {
+	public static String getQuestTag(ItemStack item) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
 		if(mcItem == null) {
 			return "";
@@ -172,7 +281,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 			return "";
 		}
 	}
-	public boolean isPlayerBound(ItemStack item, String p) {
+	public static boolean isPlayerBound(ItemStack item, String p) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
 		if(mcItem == null) {
 			return false;
@@ -188,7 +297,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 			return false;
 		}
 	}
-	public String getBoundPlayer(ItemStack item) {
+	public static String getBoundPlayer(ItemStack item) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
 		if(mcItem == null) {
 			return "";
@@ -200,21 +309,21 @@ public class CorePlugin extends JavaPlugin implements Listener {
 			return "";
 		}
 	}
-	public void setQuestTag(ItemStack item, String s) {
+	public static void setQuestTag(ItemStack item, String s) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
 		if(!mcItem.hasTag()) {
 			mcItem.setTag(new NBTTagCompound());
 		}
 		mcItem.getTag().setString("QuestItem", s);
 	}
-	public void setPlayerBound(ItemStack i, String p) {
+	public static void setPlayerBound(ItemStack i, String p) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
 		if(!mcItem.hasTag()) {
 			mcItem.setTag(new NBTTagCompound());
 		}
 		mcItem.getTag().setString("bound", p);
 	}
-	public void setName(ItemStack i, String name) {
+	public static void setName(ItemStack i, String name) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
 		if(!mcItem.hasTag()) {
 			mcItem.setTag(new NBTTagCompound());
@@ -225,7 +334,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 		
 		mcItem.getTag().getCompound("display").setString("Name", name);
 	}
-	public String getName(ItemStack i) {
+	public static String getName(ItemStack i) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
 		if(mcItem == null) {
 			return null;
@@ -241,7 +350,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 		}
 		return mcItem.getTag().getCompound("display").getString("Name");
 	}
-	public void setBook(ItemStack item, String author, String title, String[] pages){
+	public static void setBook(ItemStack item, String author, String title, String[] pages){
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
 		if(!mcItem.hasTag()) {
 			mcItem.setTag(new NBTTagCompound());
@@ -254,7 +363,138 @@ public class CorePlugin extends JavaPlugin implements Listener {
 			mcItem.getTag().getList("pages").add(tag);
 		}
 	}
-	public void setLore(ItemStack item, String[] lore) {
+	
+	HashMap<Integer,PendingPackage> pendingpkgs = new HashMap<Integer,PendingPackage>();
+	public ItemStack packageItem(ShippableInventory source, ItemStack packagable, ShippableInventory destination) {
+		
+		if(getPackageId(packagable) == 0 || getQuestTag(packagable).isEmpty()) {
+			return null;
+		}
+		PendingPackage p = PendingPackage.generateUniquePackage(pendingpkgs.values());
+		pendingpkgs.put(p.ID, p);
+		p.destination = destination;
+		p.source = source;
+		CorePlugin.setPackageAmount(packagable, packagable.getAmount());
+		packagable.setAmount(1);
+		CorePlugin.setPakageSource(packagable, true);
+		CorePlugin.setPackageID(packagable, p.ID);
+		
+		CraftItemStack pkg = new CraftItemStack(Material.JUKEBOX);
+		CorePlugin.setPackageAmount(pkg, CorePlugin.getPakageAmount(packagable));
+		CorePlugin.setPackageID(pkg, p.ID);
+		
+		this.describePackage(pkg);
+		this.describePackage(packagable);
+		//net.minecraft.server.ItemStack mcItem = ((CraftItemStack) pkg).getHandle();
+		
+		return pkg;
+	}
+	public void describePackage(ItemStack i) {
+		if(CorePlugin.getPackageId(i) != 0) {
+			if(CorePlugin.isPakageSource(i)) {
+				String[] lore = {"Item is shipping"};
+				CorePlugin.setLore(i, lore);
+			} else {
+				PendingPackage pend = this.pendingpkgs.get(CorePlugin.getPackageId(i));
+
+				if(pend != null) {
+					ItemStack packable = findByPackageId(CorePlugin.getPackageId(i),pend.source.inventory);
+					String name = getName(packable);
+					if(name == null) {
+						name = packable.getType().name().toLowerCase();
+					}
+					setName(i, "Pending Package for " + name);
+					String[] lore = {"Item is being shipped from: " + pend.source.name,
+							"Progress: " + pend.progress + "/" + pend.required};
+					setLore(i,lore);
+				} else {
+					setName(i, "Pending Package");
+				}
+			}
+
+		}
+
+		
+	}
+	
+	public ItemStack findByPackageId(int id, Inventory i) {
+		PendingPackage p = pendingpkgs.get(id);
+		if(p.ID != id) { //Should never happen, so remove the error
+			pendingpkgs.remove(id);
+			p = null;
+		}
+		ItemStack itm = null;
+		
+		if(p != null) {
+			ListIterator<ItemStack> itr = p.source.inventory.iterator();
+			while(itr.hasNext()) {
+				ItemStack tmp = itr.next();
+				if(getPackageId(tmp) == id) {
+					itm = tmp;
+					break;
+				}
+			}
+		}
+		
+		return itm;
+	}
+	public static int getPackageId(ItemStack i) {
+		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
+		if(mcItem == null) {
+			return 0;
+		}
+		if(mcItem.hasTag()) {
+			return mcItem.getTag().getInt("package-id");
+		} else {
+			return 0;
+		}
+	}
+	public static boolean isPakageSource(ItemStack i) {
+		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
+		if(mcItem == null) {
+			return false;
+		}
+		if(mcItem.hasTag()) {
+			return mcItem.getTag().getBoolean("package-source");
+		} else {
+			return false;
+		}
+	}
+	public static void setPakageSource(ItemStack i, boolean source) {
+		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
+		if(!mcItem.hasTag()) {
+			mcItem.setTag(new NBTTagCompound());
+		}
+		mcItem.getTag().setBoolean("package-id", source);
+	}
+	public static int getPakageAmount(ItemStack i) {
+		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
+		if(mcItem == null) {
+			return 0;
+		}
+		if(mcItem.hasTag()) {
+			return mcItem.getTag().getInt("package-amount");
+		} else {
+			return 0;
+		}
+	}
+	
+	public static void setPackageID(ItemStack item, int id) {
+		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
+		if(!mcItem.hasTag()) {
+			mcItem.setTag(new NBTTagCompound());
+		}
+		mcItem.getTag().setInt("package-id", id);
+	}
+	public static void setPackageAmount(ItemStack item, int id) {
+		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
+		if(!mcItem.hasTag()) {
+			mcItem.setTag(new NBTTagCompound());
+		}
+		mcItem.getTag().setInt("package-amount", id);
+	}
+	
+	public static void setLore(ItemStack item, String[] lore) {
 		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
 		if(!mcItem.hasTag()) {
 			mcItem.setTag(new NBTTagCompound());
@@ -270,7 +510,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 		}
 		mcItem.getTag().getCompound("display").set("Lore", l);
 	}
-	public void describe(ItemStack item) {
+	public static void describe(ItemStack item) {
 		
 		//net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
 		String qtag = getQuestTag(item);
@@ -372,10 +612,10 @@ public class CorePlugin extends JavaPlugin implements Listener {
 		if(pages.size() == 0) {
 			pages.add("You have no notes");
 		}
-		this.setBook(b, p.getName(), "Quest Log", pages.toArray(new String[0]));
-		this.setQuestTag(b, "log");
+		CorePlugin.setBook(b, p.getName(), "Quest Log", pages.toArray(new String[0]));
+		CorePlugin.setQuestTag(b, "log");
 		String[] lore = { "A collection of notes" }; 
-		this.setLore(b, lore);
+		CorePlugin.setLore(b, lore);
 		return b;
 	}
 	public void sendQuestLog(Player p) {
@@ -447,6 +687,7 @@ public class CorePlugin extends JavaPlugin implements Listener {
 		try {
 			ScriptableOutputStream outs = new ScriptableOutputStream(new FileOutputStream(new File(this.getDataFolder(),"data/"+s+".dat")), scope);
 			outs.writeObject(data);
+			outs.close();
 			
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
