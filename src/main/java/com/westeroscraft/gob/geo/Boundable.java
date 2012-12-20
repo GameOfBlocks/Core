@@ -20,6 +20,7 @@ public abstract class Boundable  implements MBR{
 		return false;
 	}
 	public MBR union(MBR mbr) {
+		//new SimpleMBR();
 		// TODO Auto-generated method stub
 		return null;
 	}

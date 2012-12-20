@@ -21,12 +21,12 @@ public class Cube extends Boundable {
 
 	public double getMax(int axis) {
 		// TODO Auto-generated method stub
-		return 0;
+		return this.minvalues[axis];
 	}
 
 	public double getMin(int axis) {
 		// TODO Auto-generated method stub
-		return 0;
+		return this.maxvalues[axis];
 	}
 
 }

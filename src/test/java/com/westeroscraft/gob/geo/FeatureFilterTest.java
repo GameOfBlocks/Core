@@ -24,11 +24,16 @@ public class FeatureFilterTest {
 		mg.addPoint(new Point(0,0));
 		mg.addPoint(new Point(0,1));
 		mg.addPoint(new Point(1,1));
-		mg.addPoint(new Point(1,0));
+		mg.addPoint(new Point(0,1));
 		mg.addPoint(new Point(0,0));
-		boolean test = mg.intersect(new Point(0.5,1));
-		
-		System.out.println(test);
+		boolean result= false;
+		long time  = System.currentTimeMillis();
+		for(int i = 0; i < 10000000; i ++) {
+			result = mg.intersect(new Point(0.5,1.1));
+		}
+		long fin = System.currentTimeMillis() - time;
+		System.out.println(fin);
+		System.out.println(result);
 		
 	}
 
