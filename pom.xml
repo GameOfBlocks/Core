@@ -59,13 +59,6 @@
 			<artifactId>js</artifactId>
 			<version>1.7R2</version>
 		</dependency>
-        <dependency>
-        	<groupId>prtree</groupId>
-			<artifactId>index</artifactId>
-			<version>1.0</version>
-			<scope>system</scope>
-			<systemPath>${project.basedir}/prtree.jar</systemPath>
-		</dependency>
     </dependencies>
   <build>
     <plugins>
@@ -84,7 +77,6 @@
                 <includes>
                   <includes>rhino:js</includes>
                   <includes>com.google.code.gson:gson</includes>
-                  <includes>prtree:index</includes>
                 </includes>
               </artifactSet>
             </configuration>

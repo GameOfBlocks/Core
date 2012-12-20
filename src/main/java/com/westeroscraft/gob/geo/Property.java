@@ -1,5 +1,5 @@
 package com.westeroscraft.gob.geo;
 
-public interface Property {
+public class Property extends Magigon {
 	
 }

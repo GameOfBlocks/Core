@@ -1,17 +1,13 @@
 package com.westeroscraft.gob.geo;
 
-import org.khelekore.prtree.PointND;
 
-public class Feature implements PointND {
+public class Feature extends Point {
+	
+	protected int level = 0;
 
-	public int getDimensions() {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	public double getOrd(int arg0) {
-		// TODO Auto-generated method stub
-		return 0;
+	public Feature(double x, double z, int level) {
+		super(x, z);
+		// TODO Auto-generated constructor stub
 	}
 
 }
