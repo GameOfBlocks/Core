@@ -13,7 +13,7 @@ import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Server;
-import org.bukkit.craftbukkit.inventory.CraftItemStack;
+import org.bukkit.craftbukkit.v1_4_R1.inventory.CraftItemStack;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -143,7 +143,7 @@ public class JSFunctions {
 				data = ((Number) o).shortValue();
 			}
 			
-			ItemStack is = new CraftItemStack(id,amount,data);
+			ItemStack is = CraftItemStack.asCraftCopy(new ItemStack(id,amount,data));
 			
 			
 			o = ScriptableObject.getProperty(item, "name");

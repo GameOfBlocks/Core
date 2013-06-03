@@ -1,11 +1,13 @@
 package com.westeroscraft.gob.menu;
 
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.concurrent.Callable;
 
-import net.minecraft.server.NBTTagCompound;
+import net.minecraft.server.v1_4_R1.NBTTagCompound;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.craftbukkit.inventory.CraftItemStack;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.Event.Result;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -15,33 +17,89 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 
-import com.westeroscraft.gob.menu.MenuItem.behaviour;
+import com.westeroscraft.gob.core.CorePlugin;
 
 public class Menu implements Listener{
 	
-	private int slot_sorce;
 	
-	private ArrayList<MenuItem> menuItems = new ArrayList<MenuItem>();
+	private HashMap<Integer,MenuItem> menuItems = new HashMap<Integer,MenuItem>();
 	
 	private Inventory inv; 
 
 	
 	public Menu(Inventory i) {
 		this.inv = i;
+		menuItems.put(InventoryView.OUTSIDE, getNullItem());
 	}
+	
+	public static class closefuture implements Callable<Object> {
+		
+		private HumanEntity e;
+		public closefuture(HumanEntity e) {
+			this.e =e;
+		}
+		public Object call() {
+			e.closeInventory();
+			return null;
+		}
+	}
+
+	
+	private static MenuItem nullitm = new MenuItem() {
+		public ItemStack render() {
+			return null;
+		}
+
+		public String[] getHelpText() {
+			return null;
+		}
+
+		public boolean pickup(MenuEvent e) {
+			if(e.isOutside()) {
+				if(e.getCursorItem() != null && e.getCursorItem().getType() != Material.AIR) {
+					MenuItem cursor = e.getCursorMenuItem();
+					if(cursor != null) {
+						cursor.onDelete(e.getMenu());
+					}
+				} else {
+					closefuture fut = new closefuture(e.getPlayer());
+					Bukkit.getScheduler().callSyncMethod(Bukkit.getPluginManager().getPlugin("GOB"), fut);
+				}
+			} else {
+				if(e.getCursorItem() != null && e.getCursorMenuItem() == null) {
+					
+					return false;
+				}
+			}
+			return true;
+		}
+
+		public boolean place(MenuEvent e) {
+			//This enforces players cannot place non menu items into the menu
+
+			return true;
+		}
+
+		public void onDelete(Menu m) {} // You cannot delete the null object
+	};
+	
+	protected MenuItem getNullItem(){
+		return Menu.nullitm;
+	}
+	
+	
 	public static void setMenuIndex(ItemStack item, int id) {
-		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) item).getHandle();
+		net.minecraft.server.v1_4_R1.ItemStack mcItem = CorePlugin.getHandle(item);
 		if(!mcItem.hasTag()) {
 			mcItem.setTag(new NBTTagCompound());
 		}
 		mcItem.getTag().setInt("menu-index", id);
 	}
-	
 	public static int getMenuIndex(ItemStack i) {
-		if(i == null) {
-			return -1;
+		if(i == null || i.getType() == Material.AIR) {
+			return InventoryView.OUTSIDE;
 		}
-		net.minecraft.server.ItemStack mcItem = ((CraftItemStack) i).getHandle();
+		net.minecraft.server.v1_4_R1.ItemStack mcItem = CorePlugin.getHandle(i);
 
 		if(mcItem.hasTag()) {
 			return mcItem.getTag().getInt("menu-index");
@@ -52,22 +110,38 @@ public class Menu implements Listener{
 	
 	public void rerender() {
 		for(int a = 0; a < this.inv.getSize(); a++) {
-			ItemStack i = this.inv.getItem(a);
-			if(i != null && i.getType() != Material.AIR) {
-				int m = getMenuIndex(i);
-				if(m >= 0 && m < menuItems.size()) {
-					MenuItem menui = this.menuItems.get(m);
-					ItemStack Item = menui.render();
-					setMenuIndex(Item, m);
-					this.inv.setItem(a, Item);
+			MenuItem mi = this.getMenuItembySlot(a);
+			if(mi != null) {
+				ItemStack i = mi.render();
+				if(i != null) {
+					setMenuIndex(i, getMenuIndex(this.inv.getItem(a))); 
 				}
+				this.inv.setItem(a, i);
 			}
 		}
 	}
 	
+	public void rerenderSlot(int slot) {
+		MenuItem mi = this.getMenuItembySlot(slot);
+		if(mi != null) {
+			ItemStack i = mi.render();
+			if(i != null) {
+				setMenuIndex(i, getMenuIndex(this.inv.getItem(slot))); 
+			}
+			this.inv.setItem(slot, i);
+		}
+	}
+	
+	
+	public MenuItem getMenuItembySlot(int slot) {
+		return getMenuItembyID(getMenuIndex(this.inv.getItem(slot)));
+	}
+	public MenuItem getMenuItembyID(int id) {
+		return this.menuItems.get(id);
+	}
 	public void addMenuItem(int slot, MenuItem m) {
-		menuItems.add(m);
-		int index = menuItems.size() - 1;
+		int index = menuItems.size();
+		menuItems.put(index,m);
 		ItemStack Item = m.render();
 		setMenuIndex(Item, index);
 		this.inv.setItem(slot, Item);
@@ -75,35 +149,19 @@ public class Menu implements Listener{
 	public boolean addMenuItem(MenuItem m) {
 		int slot = this.inv.firstEmpty();
 		if(slot >= 0) {
-			menuItems.add(m);
-			int index = menuItems.size() - 1;
-			ItemStack Item = m.render();
-			setMenuIndex(Item, index);
-			this.inv.setItem(slot, Item);
-			return true;			
+			this.addMenuItem(slot, m);
+			return true;
 		} else {
 			return false;
 		}
-		
 	}
-	@EventHandler (priority = EventPriority.MONITOR)
-	public void onInventoryClickMonitor(InventoryClickEvent e) {
-		if(e.getView().getTitle() != "Game Menu") {
-			return;
-		}
-		
-		if(e.getResult() == Result.ALLOW || e.getResult() == Result.DEFAULT) {
-			int rawslot = e.getRawSlot();
-			if(rawslot != InventoryView.OUTSIDE) {
-				this.slot_sorce = rawslot;
-			}
-		}
-	}
-	
 	public Inventory getInventory(){
 		return this.inv;
 	}
 	
+	
+	
+	//Note: The order of processing is this Cursor then the slot
 	
 	
 	@EventHandler
@@ -115,63 +173,23 @@ public class Menu implements Listener{
 		
 		
 		//If the cursor is blank start a pickup tansaction
-		if(e.getCursor() == null || e.getCursor().getType() == Material.AIR) {
-			if(e.getRawSlot() < 27 && e.getRawSlot() != InventoryView.OUTSIDE) { //Item clicked is inside menu
-				//get the menuItem
-				int midex = -1;
-				ItemStack currenti = e.getCurrentItem();
-				if(currenti != null) {
-					midex = getMenuIndex(currenti);
-				}
-				if(midex >= 0 && midex < menuItems.size()) {
-					MenuItem i = menuItems.get(midex);
-					if(i instanceof PickableMenuItem && !((PickableMenuItem) i).pickup(e.getRawSlot(), e.getInventory())) {
-						e.setResult(Result.DENY);
-					}
-					if(!i.getBehaviours().contains(behaviour.LIFTABLE)) {
-						e.setResult(Result.DENY);
-					}
-					
-				}
-			}
+		
+		MenuEvent Mevent = new MenuEvent(e.getView(),this,e.getRawSlot());
+		MenuItem currentMenuItem = Mevent.getCursorMenuItem();
+		boolean placeresult = true;
+		boolean pickupresult = true;
+		
+		if(currentMenuItem != null) {
+			placeresult = currentMenuItem.place(Mevent);
+		}
+		currentMenuItem = Mevent.getClickedMenuItem();
+		
+		if(currentMenuItem != null) {
+			pickupresult = currentMenuItem.pickup(Mevent);
 		}
 		
-		//If the cursor contains an Item
-		if(e.getCursor() != null && e.getCursor().getType() != Material.AIR) {
-			int cindex = getMenuIndex(e.getCursor());
-			MenuItem i = null;
-			if(cindex >= 0 && cindex < menuItems.size()) {
-				i = this.menuItems.get(cindex);
-			}
-			int mindex = getMenuIndex(e.getCursor());
-			MenuItem ci = null;
-			if(mindex >= 0 && mindex < menuItems.size()) {
-				ci = this.menuItems.get(mindex);
-			}
-			
-			
-			if(e.getRawSlot() == InventoryView.OUTSIDE) {
-				if(i != null && !i.getBehaviours().contains(behaviour.DELETEABLE)) {
-					e.setResult(Result.DENY);
-				}
-			} else if(e.getRawSlot() < 27) { //inside menu
-				if(i == null) {
-					e.setResult(Result.DENY);
-				} else {
-					if(i instanceof PlaceableMenuItem && !((PlaceableMenuItem) i).place(ci,e.getRawSlot(), e.getInventory())) {
-						e.setResult(Result.DENY);
-					}
-					if(!i.getBehaviours().contains(behaviour.MOVEABLE)) {
-						e.setResult(Result.DENY);
-					}
-				}
-			} else if( e.getRawSlot() >= e.getInventory().getSize()) {
-				if(i != null) {
-					if(!i.getBehaviours().contains(behaviour.PLAYEROWNABLE)) {
-						e.setResult(Result.DENY);
-					}
-				}
-			}
+		if(!placeresult || !pickupresult) {
+			e.setResult(Result.DENY);
 		}
 	}
 }
